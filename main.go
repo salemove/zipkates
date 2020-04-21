@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -15,6 +16,18 @@ import (
 const (
 	allNamespaces = ""
 )
+
+func podIpKeyFunc(obj interface{}) ([]string, error) {
+	pod, ok := obj.(*v1.Pod)
+	if !ok {
+		return []string{}, fmt.Errorf("%v is not a v1.Pod", obj)
+	}
+	if pod.Status.PodIP == "" {
+		return []string{}, nil
+	}
+
+	return []string{pod.Status.PodIP}, nil
+}
 
 func main() {
 	var kubeconfig string
@@ -42,8 +55,8 @@ func main() {
 		allNamespaces,
 		fields.Everything(),
 	)
-	store := cache.NewTTLStore(cache.MetaNamespaceKeyFunc, 5*time.Minute)
-	reflector := cache.NewReflector(podListWatcher, &v1.Pod{}, store, 10*time.Second)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"ip": podIpKeyFunc})
+	reflector := cache.NewReflector(podListWatcher, &v1.Pod{}, indexer, 10*time.Second)
 
 	// Now let's start the controller
 	stop := make(chan struct{})
@@ -51,7 +64,13 @@ func main() {
 	go reflector.Run(stop)
 
 	for {
-		klog.Infof("There are %d pods in the store", len(store.ListKeys()))
+		klog.Infof("There are %d pods in the store", len(indexer.ListKeys()))
+		klog.Infof("These are the pod keys: %v", indexer.ListKeys())
+		klog.Infof("These are the pod IPs: %v", indexer.ListIndexFuncValues("ip"))
+		if len(indexer.ListKeys()) > 0 {
+			ip, _ := podIpKeyFunc(indexer.List()[0])
+			klog.Infof("One pod has IP: %s", ip[0])
+		}
 		time.Sleep(time.Second)
 	}
 }
