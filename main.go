@@ -2,11 +2,18 @@ package main
 
 import (
 	"flag"
+	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
+)
+
+const (
+	allNamespaces = ""
 )
 
 func main() {
@@ -29,9 +36,22 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	pods, err := clientset.CoreV1().Pods("").List(metav1.ListOptions{})
-	if err != nil {
-		klog.Fatal(err)
+	podListWatcher := cache.NewListWatchFromClient(
+		clientset.CoreV1().RESTClient(),
+		"pods",
+		allNamespaces,
+		fields.Everything(),
+	)
+	store := cache.NewTTLStore(cache.MetaNamespaceKeyFunc, 5*time.Minute)
+	reflector := cache.NewReflector(podListWatcher, &v1.Pod{}, store, 10*time.Second)
+
+	// Now let's start the controller
+	stop := make(chan struct{})
+	defer close(stop)
+	go reflector.Run(stop)
+
+	for {
+		klog.Infof("There are %d pods in the store", len(store.ListKeys()))
+		time.Sleep(time.Second)
 	}
-	klog.Infof("There are %d pods in the cluster", len(pods.Items))
 }
