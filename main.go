@@ -1,15 +1,14 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 )
 
@@ -30,15 +29,7 @@ func podIpKeyFunc(obj interface{}) ([]string, error) {
 }
 
 func main() {
-	var kubeconfig string
-	var master string
-
-	flag.StringVar(&kubeconfig, "kubeconfig", "/Users/deiwin/.config/k3d/k3s-default/kubeconfig.yaml", "absolute path to the kubeconfig file")
-	flag.StringVar(&master, "master", "https://localhost:6443", "master url")
-	flag.Parse()
-
-	// creates the connection
-	config, err := clientcmd.BuildConfigFromFlags(master, kubeconfig)
+	config, err := rest.InClusterConfig()
 	if err != nil {
 		klog.Fatal(err)
 	}
