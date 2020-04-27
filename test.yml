@@ -2,85 +2,68 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: test-zipkin
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRole
-metadata:
-  name: zipkin
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  - namespaces
-  verbs:
-  - list
-  - watch
+  name: test-service
 ---
 apiVersion: v1
-kind: ServiceAccount
+kind: Pod
 metadata:
-  name: zipkin
-  namespace: test-zipkin
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  name: zipkin
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: zipkin
-subjects:
-- kind: ServiceAccount
-  name: zipkin
-  namespace: test-zipkin
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: zipkin
-  namespace: test-zipkin
+  name: zipkin-client
+  namespace: test-service
+  labels:
+    app: zipkin-client
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: zipkin
-  template:
-    metadata:
-      labels:
-        app: zipkin
-    spec:
-      containers:
-      - name: zipkin
-        image: openzipkin/zipkin:2.21.1
-        ports:
-        - containerPort: 9410
-        env:
-          - name: STORAGE_TYPE
-            value: mem
-          - name: QUERY_PORT
-            value: "9410"
-      - name: proxy
-        image: registry.local:5000/proxy:latest
-      serviceAccount: zipkin
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: zipkin
-  namespace: test-zipkin
-spec:
-  type: ClusterIP
-  selector:
-    app: zipkin
-  ports:
-    - port: 9410
-      targetPort: 9410
-      protocol: TCP
-      name: tcp-zipkin
-    - port: 9411
-      targetPort: 9411
-      protocol: TCP
-      name: tcp-proxy
+  containers:
+  - name: zipkin-client
+    image: alpine:3.11
+    command: ["/bin/sh"]
+    args:
+    - -c
+    - |
+      set -euo pipefail
+      apk add --no-cache curl jq
+
+      sample_span() {
+      cat << EOF
+      {
+        "id": "352bff9a74ca9ad2",
+        "traceId": "5af7183fb1d4cf5f",
+        "parentId": "6b221d5bc9e6496c",
+        "name": "get /api",
+        "timestamp": 1556604172355737,
+        "duration": 1431,
+        "kind": "SERVER",
+        "localEndpoint": {
+          "serviceName": "backend",
+          "ipv4": "192.168.99.1",
+          "port": 3306
+        },
+        "remoteEndpoint": {
+          "ipv4": "172.19.0.2",
+          "port": 58648
+        },
+        "tags": {
+          "http.method": "GET",
+          "http.path": "/api"
+        }
+      }
+      EOF
+      }
+
+      sample_span |
+        jq '[. * {id:"1"}, . * {id:"2",tags:{owner:"from_data"}}]' |
+        curl -s -X POST "http://zipkin.test-zipkin:9411/api/v2/spans" \
+        -H "accept: application/json" \
+        -H "content-type: application/json" \
+        --data-binary @-
+
+      sample_span |
+        jq '[. * {id:"3"}]' |
+        curl -s -X POST "http://zipkin.test-zipkin:9410/api/v2/spans" \
+        -H "accept: application/json" \
+        -H "content-type: application/json" \
+        --data-binary @-
+
+      curl -s -X GET "http://zipkin.test-zipkin:9411/api/v2/trace/5af7183fb1d4cf5f" \
+        -H "accept: application/json" |
+        jq '.'
+  restartPolicy: Never

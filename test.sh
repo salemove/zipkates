@@ -9,4 +9,6 @@ export KUBECONFIG
 
 docker build -t registry.local:5000/proxy:latest .
 docker push registry.local:5000/proxy:latest
-kubectl apply -f test.yml
+kubectl apply --wait=true -f setup.yml
+kubectl -n test-zipkin rollout status deploy/zipkin
+kubectl apply --wait=true -f test.yml
