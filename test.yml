@@ -37,22 +37,50 @@ subjects:
   name: zipkin
   namespace: test-zipkin
 ---
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: zipkin
   namespace: test-zipkin
 spec:
-  containers:
-  - name: zipkin
-    image: openzipkin/zipkin:2.21.1
-    ports:
-    - containerPort: 9410
-    env:
-      - name: STORAGE_TYPE
-        value: mem
-      - name: QUERY_PORT
-        value: "9410"
-  - name: proxy
-    image: registry.local:5000/proxy:latest
-  serviceAccount: zipkin
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zipkin
+  template:
+    metadata:
+      labels:
+        app: zipkin
+    spec:
+      containers:
+      - name: zipkin
+        image: openzipkin/zipkin:2.21.1
+        ports:
+        - containerPort: 9410
+        env:
+          - name: STORAGE_TYPE
+            value: mem
+          - name: QUERY_PORT
+            value: "9410"
+      - name: proxy
+        image: registry.local:5000/proxy:latest
+      serviceAccount: zipkin
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zipkin
+  namespace: test-zipkin
+spec:
+  type: ClusterIP
+  selector:
+    app: zipkin
+  ports:
+    - port: 9410
+      targetPort: 9410
+      protocol: TCP
+      name: tcp-zipkin
+    - port: 9411
+      targetPort: 9411
+      protocol: TCP
+      name: tcp-proxy

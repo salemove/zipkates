@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httputil"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -54,14 +56,12 @@ func main() {
 	defer close(stop)
 	go reflector.Run(stop)
 
-	for {
-		klog.Infof("There are %d pods in the store", len(indexer.ListKeys()))
-		klog.Infof("These are the pod keys: %v", indexer.ListKeys())
+	director := func(req *http.Request) {
+		klog.Infof("Got request: %+v", req)
 		klog.Infof("These are the pod IPs: %v", indexer.ListIndexFuncValues("ip"))
-		if len(indexer.ListKeys()) > 0 {
-			ip, _ := podIpKeyFunc(indexer.List()[0])
-			klog.Infof("One pod has IP: %s", ip[0])
-		}
-		time.Sleep(time.Second)
+		req.URL.Scheme = "http"
+		req.URL.Host = "127.0.0.1:9410"
 	}
+	handler := &httputil.ReverseProxy{Director: director}
+	klog.Fatal(http.ListenAndServe(":9411", handler))
 }
