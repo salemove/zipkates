@@ -17,6 +17,11 @@ import (
 
 const (
 	allNamespaces = ""
+	ipIndex       = "ip"
+)
+
+var (
+	hostPortRegex = regexp.MustCompile(`^(.*):.*$`)
 )
 
 func podIpKeyFunc(obj interface{}) ([]string, error) {
@@ -29,6 +34,29 @@ func podIpKeyFunc(obj interface{}) ([]string, error) {
 	}
 
 	return []string{pod.Status.PodIP}, nil
+}
+
+func getRequesterPod(indexer cache.Indexer, req *http.Request) (*v1.Pod, error) {
+	match := hostPortRegex.FindStringSubmatch(req.RemoteAddr)
+	if len(match) != 2 {
+		return &v1.Pod{}, fmt.Errorf("RemoteAddr \"%s\" does not contain \"host:port\"", req.RemoteAddr)
+	}
+	host := match[1]
+	podObjects, err := indexer.ByIndex(ipIndex, host)
+	if err != nil {
+		return &v1.Pod{}, err
+	}
+	if klog.V(1) {
+		klog.Infof("Found the following requester pod(s) for RemoteAddr \"%s\": %+v", req.RemoteAddr, podObjects)
+	}
+	if len(podObjects) != 1 {
+		return &v1.Pod{}, fmt.Errorf("Found %d pod objects in index instead of one", len(podObjects))
+	}
+	pod, ok := podObjects[0].(*v1.Pod)
+	if !ok {
+		return &v1.Pod{}, fmt.Errorf("%+v is not a v1.Pod", podObjects[0])
+	}
+	return pod, nil
 }
 
 func main() {
@@ -49,7 +77,7 @@ func main() {
 		allNamespaces,
 		fields.Everything(),
 	)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"ip": podIpKeyFunc})
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{ipIndex: podIpKeyFunc})
 	reflector := cache.NewReflector(podListWatcher, &v1.Pod{}, indexer, 10*time.Second)
 
 	// Now let's start the controller
@@ -57,29 +85,18 @@ func main() {
 	defer close(stop)
 	go reflector.Run(stop)
 
-	re := regexp.MustCompile(`^(.*):.*$`)
 	director := func(req *http.Request) {
 		req.URL.Scheme = "http"
 		req.URL.Host = "127.0.0.1:9410"
 
 		klog.Infof("Got request: %+v", req)
-		klog.Infof("These are the pod IPs: %v", indexer.ListIndexFuncValues("ip"))
-		pods, err := indexer.ByIndex("ip", re.FindStringSubmatch(req.RemoteAddr)[1])
+		klog.Infof("These are the pod IPs: %v", indexer.ListIndexFuncValues(ipIndex))
+		pod, err := getRequesterPod(indexer, req)
 		if err != nil {
 			klog.Error(err)
 			return
 		}
-		klog.Infof("It's from this pod(s): %+v", pods)
-		if len(pods) != 1 {
-			klog.Errorf("%+v does not have exactly one pod", pods)
-			return
-		}
-		podNew, ok := pods[0].(*v1.Pod)
-		if !ok {
-			klog.Errorf("%v is not a v1.Pod", pods)
-			return
-		}
-		klog.Infof("Owner: \"%s\"", podNew.ObjectMeta.Labels["owner"])
+		klog.Infof("Owner: \"%s\"", pod.ObjectMeta.Labels["owner"])
 	}
 	handler := &httputil.ReverseProxy{Director: director}
 	klog.Fatal(http.ListenAndServe(":9411", handler))
