@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"regexp"
@@ -96,7 +99,68 @@ func main() {
 			klog.Error(err)
 			return
 		}
-		klog.Infof("Owner: \"%s\"", pod.ObjectMeta.Labels["owner"])
+		owner := pod.ObjectMeta.Labels["owner"]
+		klog.Infof("Owner: \"%s\"", owner)
+		if owner == "" {
+			klog.Infof("No owner, continuing")
+			return
+		}
+		if req.Body == nil {
+			klog.Infof("Request doesn't have a body, continuing")
+			return
+		}
+		bodyBytes, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			klog.Error("Failed to read request body", err)
+			// Not sure if we can/should do anything here to fail gracefully
+			// without affecting the reverse proxy.
+			return
+		}
+		// If anything fails, then restore previous body. If we do any
+		// modifications then update bodyBytes in place to ensure new body is
+		// used for the request
+		defer func() {
+			bodyBuffer := bytes.NewBuffer(bodyBytes)
+			req.Body = ioutil.NopCloser(bodyBuffer)
+			req.ContentLength = int64(bodyBuffer.Len())
+		}()
+		var spans []map[string]interface{}
+		if err = json.Unmarshal(bodyBytes, &spans); err != nil {
+			klog.Error("Failed to parse spans from request body", err)
+			return
+		}
+		modified := false
+		for _, span := range spans {
+			tagsObj, ok := span["tags"]
+			if !ok {
+				klog.Infof("No tags were set for span, adding one tag: %+v", span)
+				span["tags"] = map[string]string{"owner": owner}
+				modified = true
+				continue
+			}
+			tags, ok := tagsObj.(map[string]interface{})
+			if !ok {
+				klog.Errorf("Couldn't parse the tags: %+v", tagsObj)
+				klog.Errorf("The tags object type: %T", tagsObj)
+				continue
+			}
+			if ownerTag, ok := tags["owner"]; ok && ownerTag != "" {
+				klog.Infof("The owner is already set for the span, skipping: %+v", span)
+				continue
+			}
+			tags["owner"] = owner
+			modified = true
+		}
+		if !modified {
+			klog.Infof("Didn't change any tags, continuing")
+			return
+		}
+		// Overwrite the body to be used for the request.
+		bodyBytes, err = json.Marshal(spans)
+		if err != nil {
+			klog.Error("Failed to marshal new body", err)
+			return
+		}
 	}
 	handler := &httputil.ReverseProxy{Director: director}
 	klog.Fatal(http.ListenAndServe(":9411", handler))
