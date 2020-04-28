@@ -62,33 +62,8 @@ func getRequesterPod(indexer cache.Indexer, req *http.Request) (*v1.Pod, error) 
 	return pod, nil
 }
 
-func main() {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		klog.Fatal(err)
-	}
-
-	// creates the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		klog.Fatal(err)
-	}
-
-	podListWatcher := cache.NewListWatchFromClient(
-		clientset.CoreV1().RESTClient(),
-		"pods",
-		allNamespaces,
-		fields.Everything(),
-	)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{ipIndex: podIpKeyFunc})
-	reflector := cache.NewReflector(podListWatcher, &v1.Pod{}, indexer, 10*time.Second)
-
-	// Now let's start the controller
-	stop := make(chan struct{})
-	defer close(stop)
-	go reflector.Run(stop)
-
-	director := func(req *http.Request) {
+func director(indexer cache.Indexer) func(req *http.Request) {
+	return func(req *http.Request) {
 		req.URL.Scheme = "http"
 		req.URL.Host = "127.0.0.1:9410"
 
@@ -162,6 +137,34 @@ func main() {
 			return
 		}
 	}
-	handler := &httputil.ReverseProxy{Director: director}
+}
+
+func main() {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		klog.Fatal(err)
+	}
+
+	// creates the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		klog.Fatal(err)
+	}
+
+	podListWatcher := cache.NewListWatchFromClient(
+		clientset.CoreV1().RESTClient(),
+		"pods",
+		allNamespaces,
+		fields.Everything(),
+	)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{ipIndex: podIpKeyFunc})
+	reflector := cache.NewReflector(podListWatcher, &v1.Pod{}, indexer, 10*time.Second)
+
+	// Now let's start the controller
+	stop := make(chan struct{})
+	defer close(stop)
+	go reflector.Run(stop)
+
+	handler := &httputil.ReverseProxy{Director: director(indexer)}
 	klog.Fatal(http.ListenAndServe(":9411", handler))
 }

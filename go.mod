@@ -3,6 +3,7 @@ module github.com/salemove/zipkin_k8s_metadata_sidecar
 go 1.13
 
 require (
+	github.com/onsi/gomega v1.7.0
 	k8s.io/api v0.17.0
 	k8s.io/apimachinery v0.17.0
 	k8s.io/client-go v0.17.0
