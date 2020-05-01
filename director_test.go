@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http/httptest"
@@ -38,7 +39,71 @@ func TestOwnerTagAddition(t *testing.T) {
 
 	req := httptest.NewRequest(
 		"POST", "/api/v2/spans",
-		strings.NewReader(fmt.Sprintf("[%s]", span())),
+		strings.NewReader(fmt.Sprintf("[%s]", span(g, map[string]string{
+			"http.method": "GET",
+			"http.path":   "/api",
+		}))),
+	)
+	CreateDirector(indexer)(req)
+
+	body, err := ioutil.ReadAll(req.Body)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(gjson.GetBytes(body, "0.tags.owner").String()).To(Equal(owner))
+}
+
+func TestKeepOriginalOwnerTag(t *testing.T) {
+	g := NewWithT(t)
+
+	// Add requester pod to Indexer
+	indexer := CreateIndexer()
+	g.Expect(indexer.Add(pod("test-pod", testIp, "from_label"))).To(Succeed())
+
+	fromSpan := "from_span"
+	req := httptest.NewRequest(
+		"POST", "/api/v2/spans",
+		strings.NewReader(fmt.Sprintf("[%s]", span(g, map[string]string{
+			"http.method": "GET",
+			"http.path":   "/api",
+			"owner":       fromSpan,
+		}))),
+	)
+	CreateDirector(indexer)(req)
+
+	body, err := ioutil.ReadAll(req.Body)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(gjson.GetBytes(body, "0.tags.owner").String()).To(Equal(fromSpan))
+}
+
+func TestEmptyTags(t *testing.T) {
+	g := NewWithT(t)
+	owner := "from_label"
+
+	// Add requester pod to Indexer
+	indexer := CreateIndexer()
+	g.Expect(indexer.Add(pod("test-pod", testIp, owner))).To(Succeed())
+
+	req := httptest.NewRequest(
+		"POST", "/api/v2/spans",
+		strings.NewReader(fmt.Sprintf("[%s]", span(g, map[string]string{}))),
+	)
+	CreateDirector(indexer)(req)
+
+	body, err := ioutil.ReadAll(req.Body)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(gjson.GetBytes(body, "0.tags.owner").String()).To(Equal(owner))
+}
+
+func TestMissingTags(t *testing.T) {
+	g := NewWithT(t)
+	owner := "from_label"
+
+	// Add requester pod to Indexer
+	indexer := CreateIndexer()
+	g.Expect(indexer.Add(pod("test-pod", testIp, owner))).To(Succeed())
+
+	req := httptest.NewRequest(
+		"POST", "/api/v2/spans",
+		strings.NewReader(fmt.Sprintf("[%s]", span(g, nil))),
 	)
 	CreateDirector(indexer)(req)
 
@@ -59,8 +124,14 @@ func pod(name, ip, owner string) *v1.Pod {
 	}
 }
 
-func span() string {
-	return `
+func span(g *WithT, tags map[string]string) string {
+	tagsLine := ""
+	if tags != nil {
+		tagsObj, err := json.Marshal(tags)
+		g.Expect(err).NotTo(HaveOccurred())
+		tagsLine = fmt.Sprintf(`"tags": %s,`, tagsObj)
+	}
+	return fmt.Sprintf(`
 		{
 			"id": "352bff9a74ca9ad2",
 			"traceId": "5af7183fb1d4cf5f",
@@ -74,14 +145,11 @@ func span() string {
 				"ipv4": "192.168.99.1",
 				"port": 3306
 			},
+			%s
 			"remoteEndpoint": {
 				"ipv4": "172.19.0.2",
 				"port": 58648
-			},
-			"tags": {
-				"http.method": "GET",
-				"http.path": "/api"
 			}
 		}
-	`
+	`, tagsLine)
 }
