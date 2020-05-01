@@ -39,6 +39,10 @@ func podIpKeyFunc(obj interface{}) ([]string, error) {
 	return []string{pod.Status.PodIP}, nil
 }
 
+func CreateIndexer() cache.Indexer {
+	return cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{ipIndex: podIpKeyFunc})
+}
+
 func getRequesterPod(indexer cache.Indexer, req *http.Request) (*v1.Pod, error) {
 	match := hostPortRegex.FindStringSubmatch(req.RemoteAddr)
 	if len(match) != 2 {
@@ -62,7 +66,7 @@ func getRequesterPod(indexer cache.Indexer, req *http.Request) (*v1.Pod, error) 
 	return pod, nil
 }
 
-func director(indexer cache.Indexer) func(req *http.Request) {
+func CreateDirector(indexer cache.Indexer) func(req *http.Request) {
 	return func(req *http.Request) {
 		req.URL.Scheme = "http"
 		req.URL.Host = "127.0.0.1:9410"
@@ -165,6 +169,6 @@ func main() {
 	defer close(stop)
 	go reflector.Run(stop)
 
-	handler := &httputil.ReverseProxy{Director: director(indexer)}
+	handler := &httputil.ReverseProxy{Director: CreateDirector(indexer)}
 	klog.Fatal(http.ListenAndServe(":9411", handler))
 }
