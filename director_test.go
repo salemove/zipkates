@@ -18,7 +18,7 @@ const (
 )
 
 func TestProxyTargetURL(t *testing.T) {
-	g := NewGomegaWithT(t)
+	g := NewWithT(t)
 
 	path := "/api/v2/trace/5af7183fb1d4cf5f"
 	req := httptest.NewRequest("GET", path, nil)
@@ -28,7 +28,7 @@ func TestProxyTargetURL(t *testing.T) {
 }
 
 func TestOwnerTagAddition(t *testing.T) {
-	g := NewGomegaWithT(t)
+	g := NewWithT(t)
 	owner := "from_label"
 
 	// Add requester pod to Indexer
