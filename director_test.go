@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http/httptest"
 	"strings"
@@ -33,17 +34,33 @@ func TestOwnerTagAddition(t *testing.T) {
 
 	// Add requester pod to Indexer
 	indexer := CreateIndexer()
-	g.Expect(indexer.Add(&v1.Pod{
+	g.Expect(indexer.Add(pod("test-pod", testIp, owner))).To(Succeed())
+
+	req := httptest.NewRequest(
+		"POST", "/api/v2/spans",
+		strings.NewReader(fmt.Sprintf("[%s]", span())),
+	)
+	CreateDirector(indexer)(req)
+
+	body, err := ioutil.ReadAll(req.Body)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(gjson.GetBytes(body, "0.tags.owner").String()).To(Equal(owner))
+}
+
+func pod(name, ip, owner string) *v1.Pod {
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-pod",
+			Name: name,
 			Labels: map[string]string{
 				"owner": owner,
 			},
 		},
-		Status: v1.PodStatus{PodIP: testIp},
-	})).To(Succeed())
-	req := httptest.NewRequest("POST", "/api/v2/spans", strings.NewReader(`
-	[
+		Status: v1.PodStatus{PodIP: ip},
+	}
+}
+
+func span() string {
+	return `
 		{
 			"id": "352bff9a74ca9ad2",
 			"traceId": "5af7183fb1d4cf5f",
@@ -66,11 +83,5 @@ func TestOwnerTagAddition(t *testing.T) {
 				"http.path": "/api"
 			}
 		}
-	]
-	`))
-	CreateDirector(indexer)(req)
-	body, err := ioutil.ReadAll(req.Body)
-	g.Expect(err).NotTo(HaveOccurred())
-
-	g.Expect(gjson.GetBytes(body, "0.tags.owner").String()).To(Equal(owner))
+	`
 }
