@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httputil"
-	"regexp"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -21,10 +21,6 @@ import (
 const (
 	allNamespaces = ""
 	ipIndex       = "ip"
-)
-
-var (
-	hostPortRegex = regexp.MustCompile(`^(.*):.*$`)
 )
 
 func podIpKeyFunc(obj interface{}) ([]string, error) {
@@ -44,12 +40,11 @@ func CreateIndexer() cache.Indexer {
 }
 
 func getRequesterPod(indexer cache.Indexer, req *http.Request) (*v1.Pod, error) {
-	match := hostPortRegex.FindStringSubmatch(req.RemoteAddr)
-	if len(match) != 2 {
-		return &v1.Pod{}, fmt.Errorf("RemoteAddr \"%s\" does not contain \"host:port\"", req.RemoteAddr)
+	clientIP, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		return &v1.Pod{}, err
 	}
-	host := match[1]
-	podObjects, err := indexer.ByIndex(ipIndex, host)
+	podObjects, err := indexer.ByIndex(ipIndex, clientIP)
 	if err != nil {
 		return &v1.Pod{}, err
 	}
