@@ -24,6 +24,7 @@ const (
 )
 
 type Config struct {
+	LabelTagMapping map[string]string
 }
 
 func podIpKeyFunc(obj interface{}) ([]string, error) {
@@ -69,6 +70,9 @@ func getRequesterPod(indexer cache.Indexer, req *http.Request) (*v1.Pod, error) 
 }
 
 func CreateDirector(indexer cache.Indexer, cfg Config) func(req *http.Request) {
+	if cfg.LabelTagMapping == nil {
+		cfg.LabelTagMapping = map[string]string{"owner": "owner"}
+	}
 	return func(req *http.Request) {
 		req.URL.Scheme = "http"
 		req.URL.Host = "127.0.0.1:9410"
@@ -96,13 +100,23 @@ func CreateDirector(indexer cache.Indexer, cfg Config) func(req *http.Request) {
 			}
 			return
 		}
-		owner := pod.ObjectMeta.Labels["owner"]
-		if klog.V(1) {
-			klog.Infof("Owner: \"%s\"", owner)
-		}
-		if owner == "" {
+		tagValues := map[string]string{}
+		for labelName, tagName := range cfg.LabelTagMapping {
+			val := pod.ObjectMeta.Labels[labelName]
 			if klog.V(1) {
-				klog.Infof("No owner, continuing")
+				klog.Infof("Pod label %s value: \"%s\"", labelName, val)
+			}
+			if val == "" {
+				if klog.V(1) {
+					klog.Infof("Pod label %s not set", labelName)
+				}
+				continue
+			}
+			tagValues[tagName] = val
+		}
+		if len(tagValues) == 0 {
+			if klog.V(1) {
+				klog.Infof("No labels set from mapping, continuing")
 			}
 			return
 		}
@@ -137,7 +151,7 @@ func CreateDirector(indexer cache.Indexer, cfg Config) func(req *http.Request) {
 				if klog.V(1) {
 					klog.Infof("No tags were set for span, adding one tag: %+v", span)
 				}
-				span["tags"] = map[string]string{"owner": owner}
+				span["tags"] = tagValues
 				modified = true
 				continue
 			}
@@ -147,14 +161,16 @@ func CreateDirector(indexer cache.Indexer, cfg Config) func(req *http.Request) {
 				klog.Errorf("The tags object type: %T", tagsObj)
 				continue
 			}
-			if ownerTag, ok := tags["owner"]; ok && ownerTag != "" {
-				if klog.V(1) {
-					klog.Infof("The owner is already set for the span, skipping: %+v", span)
+			for tagName, value := range tagValues {
+				if tag, ok := tags[tagName]; ok && tag != "" {
+					if klog.V(1) {
+						klog.Infof("Tag %s is already set for the span, skipping: %+v", tagName, span)
+					}
+					continue
 				}
-				continue
+				tags[tagName] = value
+				modified = true
 			}
-			tags["owner"] = owner
-			modified = true
 		}
 		if !modified {
 			if klog.V(1) {

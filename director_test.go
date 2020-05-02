@@ -219,6 +219,102 @@ func TestDifferentPath(t *testing.T) {
 	g.Expect(string(body)).To(Equal(originalBody))
 }
 
+func TestDifferentTagAddition(t *testing.T) {
+	g := NewWithT(t)
+	labelName := "other_label"
+	tagName := "other_tag"
+	labelValue := "from_label"
+
+	indexer := CreateIndexer()
+	g.Expect(indexer.Add(pod("test-pod", testIp, map[string]string{labelName: labelValue}))).To(Succeed())
+
+	req := httptest.NewRequest(
+		"POST", "/api/v2/spans",
+		strings.NewReader(fmt.Sprintf("[%s]", span(g, map[string]string{
+			"http.method": "GET",
+			"http.path":   "/api",
+		}))),
+	)
+	CreateDirector(indexer, Config{LabelTagMapping: map[string]string{labelName: tagName}})(req)
+
+	body, err := ioutil.ReadAll(req.Body)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(gjson.GetBytes(body, "0.tags."+tagName).String()).To(Equal(labelValue))
+}
+
+func TestMultipleTagAddition(t *testing.T) {
+	g := NewWithT(t)
+
+	indexer := CreateIndexer()
+	g.Expect(indexer.Add(pod("test-pod", testIp, map[string]string{
+		"label_a": "label_a",
+		"label_b": "label_b",
+	}))).To(Succeed())
+
+	req := httptest.NewRequest(
+		"POST", "/api/v2/spans",
+		strings.NewReader(fmt.Sprintf("[%s]", span(g, map[string]string{
+			"http.method": "GET",
+			"http.path":   "/api",
+		}))),
+	)
+	CreateDirector(indexer, Config{LabelTagMapping: map[string]string{
+		"label_a": "tag_a",
+		"label_b": "tag_b",
+	}})(req)
+
+	body, err := ioutil.ReadAll(req.Body)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(gjson.GetBytes(body, "0.tags.tag_a").String()).To(Equal("label_a"))
+	g.Expect(gjson.GetBytes(body, "0.tags.tag_b").String()).To(Equal("label_b"))
+}
+
+func TestPartialMultipleTagAddition(t *testing.T) {
+	g := NewWithT(t)
+
+	indexer := CreateIndexer()
+	g.Expect(indexer.Add(pod("test-pod", testIp, map[string]string{
+		"label_a": "label_a",
+		"label_b": "label_b",
+	}))).To(Succeed())
+
+	req := httptest.NewRequest(
+		"POST", "/api/v2/spans",
+		strings.NewReader(fmt.Sprintf("[%s]", span(g, map[string]string{
+			"http.method": "GET",
+			"http.path":   "/api",
+			"tag_a":       "tag_a",
+		}))),
+	)
+	CreateDirector(indexer, Config{LabelTagMapping: map[string]string{
+		"label_a": "tag_a",
+		"label_b": "tag_b",
+	}})(req)
+
+	body, err := ioutil.ReadAll(req.Body)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(gjson.GetBytes(body, "0.tags.tag_a").String()).To(Equal("tag_a"))
+	g.Expect(gjson.GetBytes(body, "0.tags.tag_b").String()).To(Equal("label_b"))
+}
+
+func TestEmptyMapping(t *testing.T) {
+	g := NewWithT(t)
+
+	indexer := CreateIndexer()
+	g.Expect(indexer.Add(pod("test-pod", testIp, map[string]string{"owner": "from_label"}))).To(Succeed())
+
+	originalBody := fmt.Sprintf("[%s]", span(g, map[string]string{
+		"http.method": "GET",
+		"http.path":   "/api",
+	}))
+	req := httptest.NewRequest("POST", "/api/v2/spans", strings.NewReader(originalBody))
+	CreateDirector(indexer, Config{LabelTagMapping: map[string]string{}})(req)
+
+	body, err := ioutil.ReadAll(req.Body)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(string(body)).To(Equal(originalBody))
+}
+
 func pod(name, ip string, labels map[string]string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
