@@ -23,6 +23,9 @@ const (
 	ipIndex       = "ip"
 )
 
+type Config struct {
+}
+
 func podIpKeyFunc(obj interface{}) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
@@ -65,7 +68,7 @@ func getRequesterPod(indexer cache.Indexer, req *http.Request) (*v1.Pod, error) 
 	return pod, nil
 }
 
-func CreateDirector(indexer cache.Indexer) func(req *http.Request) {
+func CreateDirector(indexer cache.Indexer, cfg Config) func(req *http.Request) {
 	return func(req *http.Request) {
 		req.URL.Scheme = "http"
 		req.URL.Host = "127.0.0.1:9410"
@@ -194,6 +197,6 @@ func main() {
 	defer close(stop)
 	go reflector.Run(stop)
 
-	handler := &httputil.ReverseProxy{Director: CreateDirector(indexer)}
+	handler := &httputil.ReverseProxy{Director: CreateDirector(indexer, Config{})}
 	klog.Fatal(http.ListenAndServe(":9411", handler))
 }

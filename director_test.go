@@ -25,7 +25,7 @@ func TestProxyTargetURL(t *testing.T) {
 
 	path := "/api/v2/trace/5af7183fb1d4cf5f"
 	req := httptest.NewRequest("GET", path, nil)
-	CreateDirector(CreateIndexer())(req)
+	CreateDirector(CreateIndexer(), Config{})(req)
 
 	g.Expect(req.URL.String()).To(Equal("http://127.0.0.1:9410" + path))
 }
@@ -44,7 +44,7 @@ func TestOwnerTagAddition(t *testing.T) {
 			"http.path":   "/api",
 		}))),
 	)
-	CreateDirector(indexer)(req)
+	CreateDirector(indexer, Config{})(req)
 
 	body, err := ioutil.ReadAll(req.Body)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -66,7 +66,7 @@ func TestKeepOriginalOwnerTag(t *testing.T) {
 			"owner":       fromSpan,
 		}))),
 	)
-	CreateDirector(indexer)(req)
+	CreateDirector(indexer, Config{})(req)
 
 	body, err := ioutil.ReadAll(req.Body)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -84,7 +84,7 @@ func TestEmptyTags(t *testing.T) {
 		"POST", "/api/v2/spans",
 		strings.NewReader(fmt.Sprintf("[%s]", span(g, map[string]string{}))),
 	)
-	CreateDirector(indexer)(req)
+	CreateDirector(indexer, Config{})(req)
 
 	body, err := ioutil.ReadAll(req.Body)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -102,7 +102,7 @@ func TestMissingTags(t *testing.T) {
 		"POST", "/api/v2/spans",
 		strings.NewReader(fmt.Sprintf("[%s]", span(g, nil))),
 	)
-	CreateDirector(indexer)(req)
+	CreateDirector(indexer, Config{})(req)
 
 	body, err := ioutil.ReadAll(req.Body)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -113,7 +113,7 @@ func TestZeroSpans(t *testing.T) {
 	g := NewWithT(t)
 
 	req := httptest.NewRequest("POST", "/api/v2/spans", strings.NewReader("[]"))
-	CreateDirector(CreateIndexer())(req)
+	CreateDirector(CreateIndexer(), Config{})(req)
 
 	body, err := ioutil.ReadAll(req.Body)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -139,7 +139,7 @@ func TestMultipleSpans(t *testing.T) {
 			"http.path":   "/api",
 		}))),
 	)
-	CreateDirector(indexer)(req)
+	CreateDirector(indexer, Config{})(req)
 
 	body, err := ioutil.ReadAll(req.Body)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -158,7 +158,7 @@ func TestDifferentPodIP(t *testing.T) {
 		"http.path":   "/api",
 	}))
 	req := httptest.NewRequest("POST", "/api/v2/spans", strings.NewReader(originalBody))
-	CreateDirector(indexer)(req)
+	CreateDirector(indexer, Config{})(req)
 
 	body, err := ioutil.ReadAll(req.Body)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -176,7 +176,7 @@ func TestPodWithoutOwnerLabel(t *testing.T) {
 		"http.path":   "/api",
 	}))
 	req := httptest.NewRequest("POST", "/api/v2/spans", strings.NewReader(originalBody))
-	CreateDirector(indexer)(req)
+	CreateDirector(indexer, Config{})(req)
 
 	body, err := ioutil.ReadAll(req.Body)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -194,7 +194,7 @@ func TestSpansNotAnArray(t *testing.T) {
 		"http.path":   "/api",
 	})
 	req := httptest.NewRequest("POST", "/api/v2/spans", strings.NewReader(originalBody))
-	CreateDirector(indexer)(req)
+	CreateDirector(indexer, Config{})(req)
 
 	body, err := ioutil.ReadAll(req.Body)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -212,7 +212,7 @@ func TestDifferentPath(t *testing.T) {
 		"http.path":   "/api",
 	}))
 	req := httptest.NewRequest("POST", "/api/v1/spans", strings.NewReader(originalBody))
-	CreateDirector(indexer)(req)
+	CreateDirector(indexer, Config{})(req)
 
 	body, err := ioutil.ReadAll(req.Body)
 	g.Expect(err).NotTo(HaveOccurred())
