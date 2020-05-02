@@ -216,31 +216,28 @@ func pod(name, ip, owner string) *v1.Pod {
 }
 
 func span(g *WithT, tags map[string]string) string {
-	tagsLine := ""
-	if tags != nil {
-		tagsObj, err := json.Marshal(tags)
-		g.Expect(err).NotTo(HaveOccurred())
-		tagsLine = fmt.Sprintf(`"tags": %s,`, tagsObj)
+	span := map[string]interface{}{
+		"id":        "352bff9a74ca9ad2",
+		"traceId":   "5af7183fb1d4cf5f",
+		"parentId":  "6b221d5bc9e6496c",
+		"name":      "get /api",
+		"timestamp": 1556604172355737,
+		"duration":  1431,
+		"kind":      "SERVER",
+		"localEndpoint": map[string]interface{}{
+			"serviceName": "backend",
+			"ipv4":        "192.168.99.1",
+			"port":        3306,
+		},
+		"remoteEndpoint": map[string]interface{}{
+			"ipv4": "172.19.0.2",
+			"port": 58648,
+		},
 	}
-	return fmt.Sprintf(`
-		{
-			"id": "352bff9a74ca9ad2",
-			"traceId": "5af7183fb1d4cf5f",
-			"parentId": "6b221d5bc9e6496c",
-			"name": "get /api",
-			"timestamp": 1556604172355737,
-			"duration": 1431,
-			"kind": "SERVER",
-			"localEndpoint": {
-				"serviceName": "backend",
-				"ipv4": "192.168.99.1",
-				"port": 3306
-			},
-			%s
-			"remoteEndpoint": {
-				"ipv4": "172.19.0.2",
-				"port": 58648
-			}
-		}
-	`, tagsLine)
+	if tags != nil {
+		span["tags"] = tags
+	}
+	result, err := json.Marshal(span)
+	g.Expect(err).NotTo(HaveOccurred())
+	return string(result)
 }
