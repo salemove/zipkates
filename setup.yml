@@ -64,6 +64,9 @@ spec:
             value: "9410"
       - name: proxy
         image: registry.local:5000/proxy:latest
+        env:
+          - name: LABEL_TAG_MAPPING
+            value: '{"custom_label": "custom_tag"}'
       serviceAccount: zipkin
 ---
 apiVersion: v1

@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"os"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -187,6 +188,19 @@ func CreateDirector(indexer cache.Indexer, cfg Config) func(req *http.Request) {
 	}
 }
 
+func ParseConfigFromEnv() (Config, error) {
+	cfg := Config{}
+	labelTagMappingEnv := os.Getenv("LABEL_TAG_MAPPING")
+	if labelTagMappingEnv != "" {
+		var labelTagMapping map[string]string
+		if err := json.Unmarshal([]byte(labelTagMappingEnv), &labelTagMapping); err != nil {
+			return Config{}, fmt.Errorf("Failed to parse LABEL_TAG_MAPPING env variable: %w", err)
+		}
+		cfg.LabelTagMapping = labelTagMapping
+	}
+	return cfg, nil
+}
+
 func main() {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -213,6 +227,10 @@ func main() {
 	defer close(stop)
 	go reflector.Run(stop)
 
-	handler := &httputil.ReverseProxy{Director: CreateDirector(indexer, Config{})}
+	cfg, err := ParseConfigFromEnv()
+	if err != nil {
+		klog.Fatal(err)
+	}
+	handler := &httputil.ReverseProxy{Director: CreateDirector(indexer, cfg)}
 	klog.Fatal(http.ListenAndServe(":9411", handler))
 }

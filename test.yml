@@ -11,7 +11,7 @@ metadata:
   namespace: test-service
   labels:
     app: zipkin-client
-    owner: from_label
+    custom_label: from_label
 spec:
   containers:
   - name: zipkin-client
@@ -51,7 +51,7 @@ spec:
       }
 
       sample_span |
-        jq '[. * {id:"1"}, . * {id:"2",tags:{owner:"from_data"}}]' |
+        jq '[. * {id:"1"}, . * {id:"2",tags:{custom_tag:"from_data"}}]' |
         curl -s -X POST "http://zipkin.test-zipkin:9411/api/v2/spans" \
         -H "accept: application/json" \
         -H "content-type: application/json" \
