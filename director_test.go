@@ -16,7 +16,8 @@ import (
 
 const (
 	// testIp is the hardcoded value used by httptest.NewRequest in RemoteAddr
-	testIp = "192.0.2.1"
+	testIp      = "192.0.2.1"
+	differentIp = "10.0.0.1"
 )
 
 func TestProxyTargetURL(t *testing.T) {
@@ -33,7 +34,6 @@ func TestOwnerTagAddition(t *testing.T) {
 	g := NewWithT(t)
 	owner := "from_label"
 
-	// Add requester pod to Indexer
 	indexer := CreateIndexer()
 	g.Expect(indexer.Add(pod("test-pod", testIp, owner))).To(Succeed())
 
@@ -54,7 +54,6 @@ func TestOwnerTagAddition(t *testing.T) {
 func TestKeepOriginalOwnerTag(t *testing.T) {
 	g := NewWithT(t)
 
-	// Add requester pod to Indexer
 	indexer := CreateIndexer()
 	g.Expect(indexer.Add(pod("test-pod", testIp, "from_label"))).To(Succeed())
 
@@ -78,7 +77,6 @@ func TestEmptyTags(t *testing.T) {
 	g := NewWithT(t)
 	owner := "from_label"
 
-	// Add requester pod to Indexer
 	indexer := CreateIndexer()
 	g.Expect(indexer.Add(pod("test-pod", testIp, owner))).To(Succeed())
 
@@ -97,7 +95,6 @@ func TestMissingTags(t *testing.T) {
 	g := NewWithT(t)
 	owner := "from_label"
 
-	// Add requester pod to Indexer
 	indexer := CreateIndexer()
 	g.Expect(indexer.Add(pod("test-pod", testIp, owner))).To(Succeed())
 
@@ -112,13 +109,107 @@ func TestMissingTags(t *testing.T) {
 	g.Expect(gjson.GetBytes(body, "0.tags.owner").String()).To(Equal(owner))
 }
 
+func TestZeroSpans(t *testing.T) {
+	g := NewWithT(t)
+
+	req := httptest.NewRequest("POST", "/api/v2/spans", strings.NewReader("[]"))
+	CreateDirector(CreateIndexer())(req)
+
+	body, err := ioutil.ReadAll(req.Body)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(string(body)).To(Equal("[]"))
+}
+
+func TestMultipleSpans(t *testing.T) {
+	g := NewWithT(t)
+	fromLabel := "from_label"
+	fromSpan := "from_span"
+
+	indexer := CreateIndexer()
+	g.Expect(indexer.Add(pod("test-pod", testIp, fromLabel))).To(Succeed())
+
+	req := httptest.NewRequest(
+		"POST", "/api/v2/spans",
+		strings.NewReader(fmt.Sprintf("[%s, %s]", span(g, map[string]string{
+			"http.method": "GET",
+			"http.path":   "/api",
+			"owner":       fromSpan,
+		}), span(g, map[string]string{
+			"http.method": "GET",
+			"http.path":   "/api",
+		}))),
+	)
+	CreateDirector(indexer)(req)
+
+	body, err := ioutil.ReadAll(req.Body)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(gjson.GetBytes(body, "#.tags.owner").String()).
+		To(Equal(fmt.Sprintf(`["%s","%s"]`, fromSpan, fromLabel)))
+}
+
+func TestDifferentPodIP(t *testing.T) {
+	g := NewWithT(t)
+
+	indexer := CreateIndexer()
+	g.Expect(indexer.Add(pod("test-pod", differentIp, "from_label"))).To(Succeed())
+
+	originalBody := fmt.Sprintf("[%s]", span(g, map[string]string{
+		"http.method": "GET",
+		"http.path":   "/api",
+	}))
+	req := httptest.NewRequest("POST", "/api/v2/spans", strings.NewReader(originalBody))
+	CreateDirector(indexer)(req)
+
+	body, err := ioutil.ReadAll(req.Body)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(string(body)).To(Equal(originalBody))
+}
+
+func TestPodWithoutOwnerLabel(t *testing.T) {
+	g := NewWithT(t)
+
+	indexer := CreateIndexer()
+	g.Expect(indexer.Add(pod("test-pod", testIp, ""))).To(Succeed())
+
+	originalBody := fmt.Sprintf("[%s]", span(g, map[string]string{
+		"http.method": "GET",
+		"http.path":   "/api",
+	}))
+	req := httptest.NewRequest("POST", "/api/v2/spans", strings.NewReader(originalBody))
+	CreateDirector(indexer)(req)
+
+	body, err := ioutil.ReadAll(req.Body)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(string(body)).To(Equal(originalBody))
+}
+
+func TestSpansNotAnArray(t *testing.T) {
+	g := NewWithT(t)
+
+	indexer := CreateIndexer()
+	g.Expect(indexer.Add(pod("test-pod", testIp, "from_label"))).To(Succeed())
+
+	originalBody := span(g, map[string]string{
+		"http.method": "GET",
+		"http.path":   "/api",
+	})
+	req := httptest.NewRequest("POST", "/api/v2/spans", strings.NewReader(originalBody))
+	CreateDirector(indexer)(req)
+
+	body, err := ioutil.ReadAll(req.Body)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(string(body)).To(Equal(originalBody))
+}
+
 func pod(name, ip, owner string) *v1.Pod {
+	labels := map[string]string{}
+	if owner != "" {
+		labels["owner"] = owner
+	}
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"owner": owner,
-			},
+			Name:   name,
+			Labels: labels,
 		},
 		Status: v1.PodStatus{PodIP: ip},
 	}
