@@ -79,6 +79,12 @@ func CreateDirector(indexer cache.Indexer) func(req *http.Request) {
 			}
 			return
 		}
+		if req.URL.Path != "/api/v2/spans" {
+			if klog.V(1) {
+				klog.Infof("Ignoring path %s. Only /api/v2/spans requests are modified.", req.URL.Path)
+			}
+			return
+		}
 		pod, err := getRequesterPod(indexer, req)
 		if err != nil {
 			klog.Error(err)

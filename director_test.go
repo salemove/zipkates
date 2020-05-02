@@ -201,6 +201,24 @@ func TestSpansNotAnArray(t *testing.T) {
 	g.Expect(string(body)).To(Equal(originalBody))
 }
 
+func TestDifferentPath(t *testing.T) {
+	g := NewWithT(t)
+
+	indexer := CreateIndexer()
+	g.Expect(indexer.Add(pod("test-pod", testIp, "from_label"))).To(Succeed())
+
+	originalBody := fmt.Sprintf("[%s]", span(g, map[string]string{
+		"http.method": "GET",
+		"http.path":   "/api",
+	}))
+	req := httptest.NewRequest("POST", "/api/v1/spans", strings.NewReader(originalBody))
+	CreateDirector(indexer)(req)
+
+	body, err := ioutil.ReadAll(req.Body)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(string(body)).To(Equal(originalBody))
+}
+
 func pod(name, ip, owner string) *v1.Pod {
 	labels := map[string]string{}
 	if owner != "" {
