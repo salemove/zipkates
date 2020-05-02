@@ -35,7 +35,7 @@ func TestOwnerTagAddition(t *testing.T) {
 	owner := "from_label"
 
 	indexer := CreateIndexer()
-	g.Expect(indexer.Add(pod("test-pod", testIp, owner))).To(Succeed())
+	g.Expect(indexer.Add(pod("test-pod", testIp, map[string]string{"owner": owner}))).To(Succeed())
 
 	req := httptest.NewRequest(
 		"POST", "/api/v2/spans",
@@ -55,7 +55,7 @@ func TestKeepOriginalOwnerTag(t *testing.T) {
 	g := NewWithT(t)
 
 	indexer := CreateIndexer()
-	g.Expect(indexer.Add(pod("test-pod", testIp, "from_label"))).To(Succeed())
+	g.Expect(indexer.Add(pod("test-pod", testIp, map[string]string{"owner": "from_label"}))).To(Succeed())
 
 	fromSpan := "from_span"
 	req := httptest.NewRequest(
@@ -78,7 +78,7 @@ func TestEmptyTags(t *testing.T) {
 	owner := "from_label"
 
 	indexer := CreateIndexer()
-	g.Expect(indexer.Add(pod("test-pod", testIp, owner))).To(Succeed())
+	g.Expect(indexer.Add(pod("test-pod", testIp, map[string]string{"owner": owner}))).To(Succeed())
 
 	req := httptest.NewRequest(
 		"POST", "/api/v2/spans",
@@ -96,7 +96,7 @@ func TestMissingTags(t *testing.T) {
 	owner := "from_label"
 
 	indexer := CreateIndexer()
-	g.Expect(indexer.Add(pod("test-pod", testIp, owner))).To(Succeed())
+	g.Expect(indexer.Add(pod("test-pod", testIp, map[string]string{"owner": owner}))).To(Succeed())
 
 	req := httptest.NewRequest(
 		"POST", "/api/v2/spans",
@@ -126,7 +126,7 @@ func TestMultipleSpans(t *testing.T) {
 	fromSpan := "from_span"
 
 	indexer := CreateIndexer()
-	g.Expect(indexer.Add(pod("test-pod", testIp, fromLabel))).To(Succeed())
+	g.Expect(indexer.Add(pod("test-pod", testIp, map[string]string{"owner": fromLabel}))).To(Succeed())
 
 	req := httptest.NewRequest(
 		"POST", "/api/v2/spans",
@@ -151,7 +151,7 @@ func TestDifferentPodIP(t *testing.T) {
 	g := NewWithT(t)
 
 	indexer := CreateIndexer()
-	g.Expect(indexer.Add(pod("test-pod", differentIp, "from_label"))).To(Succeed())
+	g.Expect(indexer.Add(pod("test-pod", differentIp, map[string]string{"owner": "from_label"}))).To(Succeed())
 
 	originalBody := fmt.Sprintf("[%s]", span(g, map[string]string{
 		"http.method": "GET",
@@ -169,7 +169,7 @@ func TestPodWithoutOwnerLabel(t *testing.T) {
 	g := NewWithT(t)
 
 	indexer := CreateIndexer()
-	g.Expect(indexer.Add(pod("test-pod", testIp, ""))).To(Succeed())
+	g.Expect(indexer.Add(pod("test-pod", testIp, map[string]string{"owner": ""}))).To(Succeed())
 
 	originalBody := fmt.Sprintf("[%s]", span(g, map[string]string{
 		"http.method": "GET",
@@ -187,7 +187,7 @@ func TestSpansNotAnArray(t *testing.T) {
 	g := NewWithT(t)
 
 	indexer := CreateIndexer()
-	g.Expect(indexer.Add(pod("test-pod", testIp, "from_label"))).To(Succeed())
+	g.Expect(indexer.Add(pod("test-pod", testIp, map[string]string{"owner": "from_label"}))).To(Succeed())
 
 	originalBody := span(g, map[string]string{
 		"http.method": "GET",
@@ -205,7 +205,7 @@ func TestDifferentPath(t *testing.T) {
 	g := NewWithT(t)
 
 	indexer := CreateIndexer()
-	g.Expect(indexer.Add(pod("test-pod", testIp, "from_label"))).To(Succeed())
+	g.Expect(indexer.Add(pod("test-pod", testIp, map[string]string{"owner": "from_label"}))).To(Succeed())
 
 	originalBody := fmt.Sprintf("[%s]", span(g, map[string]string{
 		"http.method": "GET",
@@ -219,11 +219,7 @@ func TestDifferentPath(t *testing.T) {
 	g.Expect(string(body)).To(Equal(originalBody))
 }
 
-func pod(name, ip, owner string) *v1.Pod {
-	labels := map[string]string{}
-	if owner != "" {
-		labels["owner"] = owner
-	}
+func pod(name, ip string, labels map[string]string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
