@@ -73,6 +73,12 @@ func CreateDirector(indexer cache.Indexer) func(req *http.Request) {
 
 		klog.Infof("Got request: %+v", req)
 		klog.Infof("These are the pod IPs: %v", indexer.ListIndexFuncValues(ipIndex))
+		if req.Method != "POST" {
+			if klog.V(1) {
+				klog.Infof("Ignoring %s requests. Only POST requests can be modified.", req.Method)
+			}
+			return
+		}
 		pod, err := getRequesterPod(indexer, req)
 		if err != nil {
 			klog.Error(err)
