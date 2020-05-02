@@ -70,8 +70,10 @@ func CreateDirector(indexer cache.Indexer) func(req *http.Request) {
 		req.URL.Scheme = "http"
 		req.URL.Host = "127.0.0.1:9410"
 
-		klog.Infof("Got request: %+v", req)
-		klog.Infof("These are the pod IPs: %v", indexer.ListIndexFuncValues(ipIndex))
+		if klog.V(1) {
+			klog.Infof("Got request: %+v", req)
+			klog.Infof("These are the pod IPs: %v", indexer.ListIndexFuncValues(ipIndex))
+		}
 		if req.Method != "POST" {
 			if klog.V(1) {
 				klog.Infof("Ignoring %s requests. Only POST requests can be modified.", req.Method)
@@ -92,13 +94,17 @@ func CreateDirector(indexer cache.Indexer) func(req *http.Request) {
 			return
 		}
 		owner := pod.ObjectMeta.Labels["owner"]
-		klog.Infof("Owner: \"%s\"", owner)
+		if klog.V(1) {
+			klog.Infof("Owner: \"%s\"", owner)
+		}
 		if owner == "" {
-			klog.Infof("No owner, continuing")
+			if klog.V(1) {
+				klog.Infof("No owner, continuing")
+			}
 			return
 		}
 		if req.Body == nil {
-			klog.Infof("Request doesn't have a body, continuing")
+			klog.Warningf("Request doesn't have a body, continuing")
 			return
 		}
 		bodyBytes, err := ioutil.ReadAll(req.Body)
@@ -125,7 +131,9 @@ func CreateDirector(indexer cache.Indexer) func(req *http.Request) {
 		for _, span := range spans {
 			tagsObj, ok := span["tags"]
 			if !ok {
-				klog.Infof("No tags were set for span, adding one tag: %+v", span)
+				if klog.V(1) {
+					klog.Infof("No tags were set for span, adding one tag: %+v", span)
+				}
 				span["tags"] = map[string]string{"owner": owner}
 				modified = true
 				continue
@@ -137,14 +145,18 @@ func CreateDirector(indexer cache.Indexer) func(req *http.Request) {
 				continue
 			}
 			if ownerTag, ok := tags["owner"]; ok && ownerTag != "" {
-				klog.Infof("The owner is already set for the span, skipping: %+v", span)
+				if klog.V(1) {
+					klog.Infof("The owner is already set for the span, skipping: %+v", span)
+				}
 				continue
 			}
 			tags["owner"] = owner
 			modified = true
 		}
 		if !modified {
-			klog.Infof("Didn't change any tags, continuing")
+			if klog.V(1) {
+				klog.Infof("Didn't change any tags, continuing")
+			}
 			return
 		}
 		// Overwrite the body to be used for the request.
