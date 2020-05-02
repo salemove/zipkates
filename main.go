@@ -51,8 +51,12 @@ func getRequesterPod(indexer cache.Indexer, req *http.Request) (*v1.Pod, error) 
 	if klog.V(1) {
 		klog.Infof("Found the following requester pod(s) for RemoteAddr \"%s\": %+v", req.RemoteAddr, podObjects)
 	}
-	if len(podObjects) != 1 {
-		return &v1.Pod{}, fmt.Errorf("Found %d pod objects in index instead of one", len(podObjects))
+	if len(podObjects) < 1 {
+		return &v1.Pod{}, fmt.Errorf("Did not find any pod objects")
+	} else if len(podObjects) > 1 {
+		err := fmt.Errorf("Found more than one pod object. Found %d.", len(podObjects))
+		klog.Error(err)
+		return &v1.Pod{}, err
 	}
 	pod, ok := podObjects[0].(*v1.Pod)
 	if !ok {
@@ -82,7 +86,9 @@ func CreateDirector(indexer cache.Indexer) func(req *http.Request) {
 		}
 		pod, err := getRequesterPod(indexer, req)
 		if err != nil {
-			klog.Error(err)
+			if klog.V(1) {
+				klog.Infof("Failed to find pod: %s", err)
+			}
 			return
 		}
 		owner := pod.ObjectMeta.Labels["owner"]
