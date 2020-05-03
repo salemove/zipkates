@@ -28,6 +28,12 @@ type Config struct {
 	LabelTagMapping map[string]string
 }
 
+var (
+	DefaultConfig = Config{
+		LabelTagMapping: map[string]string{"owner": "owner"},
+	}
+)
+
 func podIpKeyFunc(obj interface{}) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
@@ -71,9 +77,6 @@ func getRequesterPod(indexer cache.Indexer, req *http.Request) (*v1.Pod, error) 
 }
 
 func CreateDirector(indexer cache.Indexer, cfg Config) func(req *http.Request) {
-	if cfg.LabelTagMapping == nil {
-		cfg.LabelTagMapping = map[string]string{"owner": "owner"}
-	}
 	return func(req *http.Request) {
 		req.URL.Scheme = "http"
 		req.URL.Host = "127.0.0.1:9410"
@@ -189,7 +192,10 @@ func CreateDirector(indexer cache.Indexer, cfg Config) func(req *http.Request) {
 }
 
 func ParseConfigFromEnv() (Config, error) {
-	cfg := Config{}
+	// Note that this is a shallow copy, but that shouldn't be a problem in
+	// this case.
+	cfg := DefaultConfig
+
 	labelTagMappingEnv := os.Getenv("LABEL_TAG_MAPPING")
 	if labelTagMappingEnv != "" {
 		var labelTagMapping map[string]string
@@ -198,6 +204,7 @@ func ParseConfigFromEnv() (Config, error) {
 		}
 		cfg.LabelTagMapping = labelTagMapping
 	}
+
 	return cfg, nil
 }
 

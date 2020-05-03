@@ -28,7 +28,7 @@ func TestLabelTagMapping(t *testing.T) {
 		cfg, err := ParseConfigFromEnv()
 
 		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(cfg.LabelTagMapping).To(BeNil())
+		g.Expect(cfg.LabelTagMapping).To(Equal(map[string]string{"owner": "owner"}))
 	})
 
 	t.Run("Empty string", func(t *testing.T) {
@@ -38,7 +38,7 @@ func TestLabelTagMapping(t *testing.T) {
 		cfg, err := ParseConfigFromEnv()
 
 		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(cfg.LabelTagMapping).To(BeNil())
+		g.Expect(cfg.LabelTagMapping).To(Equal(map[string]string{"owner": "owner"}))
 	})
 
 	t.Run("Empty map", func(t *testing.T) {
