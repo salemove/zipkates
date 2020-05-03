@@ -230,6 +230,14 @@ func ParseConfigFromEnv() (Config, error) {
 	return cfg, nil
 }
 
+func healthzHandlerFunc(w http.ResponseWriter, req *http.Request) {
+	w.WriteHeader(200)
+	_, err := w.Write([]byte("ok"))
+	if err != nil {
+		klog.Error(err)
+	}
+}
+
 func main() {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -260,6 +268,9 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
-	handler := &httputil.ReverseProxy{Director: CreateDirector(indexer, cfg)}
-	klog.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.ListenPort), handler))
+	proxyHandler := &httputil.ReverseProxy{Director: CreateDirector(indexer, cfg)}
+	mux := http.NewServeMux()
+	mux.Handle("/", proxyHandler)
+	mux.HandleFunc("/healthz", healthzHandlerFunc)
+	klog.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.ListenPort), mux))
 }

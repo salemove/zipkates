@@ -70,7 +70,8 @@ spec:
       - name: proxy
         image: registry.local:5000/proxy:latest
         ports:
-        - containerPort: 9411
+        - name: proxy-port
+          containerPort: 9411
         env:
           - name: LABEL_TAG_MAPPING
             value: '{"custom_label": "custom_tag"}'
@@ -78,6 +79,10 @@ spec:
             value: '9411'
           - name: ZIPKIN_PORT
             value: '9410'
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: proxy-port
       serviceAccount: zipkin
 ---
 apiVersion: v1
