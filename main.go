@@ -27,12 +27,14 @@ const (
 type Config struct {
 	LabelTagMapping map[string]string
 	ListenPort      int
+	ZipkinPort      int
 }
 
 var (
 	DefaultConfig = Config{
 		LabelTagMapping: map[string]string{"owner": "owner"},
 		ListenPort:      9411,
+		ZipkinPort:      9410,
 	}
 )
 
@@ -81,7 +83,7 @@ func getRequesterPod(indexer cache.Indexer, req *http.Request) (*v1.Pod, error) 
 func CreateDirector(indexer cache.Indexer, cfg Config) func(req *http.Request) {
 	return func(req *http.Request) {
 		req.URL.Scheme = "http"
-		req.URL.Host = "127.0.0.1:9410"
+		req.URL.Host = fmt.Sprintf("127.0.0.1:%d", cfg.ZipkinPort)
 
 		if klog.V(1) {
 			klog.Infof("Got request: %+v", req)
@@ -214,6 +216,15 @@ func ParseConfigFromEnv() (Config, error) {
 			return Config{}, fmt.Errorf("Failed to parse LISTEN_PORT env variable: %w", err)
 		}
 		cfg.ListenPort = listenPort
+	}
+
+	zipkinPortEnv := os.Getenv("ZIPKIN_PORT")
+	if zipkinPortEnv != "" {
+		var zipkinPort int
+		if err := json.Unmarshal([]byte(zipkinPortEnv), &zipkinPort); err != nil {
+			return Config{}, fmt.Errorf("Failed to parse ZIPKIN_PORT env variable: %w", err)
+		}
+		cfg.ZipkinPort = zipkinPort
 	}
 
 	return cfg, nil

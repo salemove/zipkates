@@ -30,6 +30,18 @@ func TestProxyTargetURL(t *testing.T) {
 	g.Expect(req.URL.String()).To(Equal("http://127.0.0.1:9410" + path))
 }
 
+func TestDifferentZipkinPort(t *testing.T) {
+	g := NewWithT(t)
+
+	path := "/api/v2/trace/5af7183fb1d4cf5f"
+	req := httptest.NewRequest("GET", path, nil)
+	cfg := DefaultConfig
+	cfg.ZipkinPort = 8080
+	CreateDirector(CreateIndexer(), cfg)(req)
+
+	g.Expect(req.URL.String()).To(Equal("http://127.0.0.1:8080" + path))
+}
+
 func TestOwnerTagAddition(t *testing.T) {
 	g := NewWithT(t)
 	owner := "from_label"

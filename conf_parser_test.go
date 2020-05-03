@@ -102,3 +102,44 @@ func TestListenPort(t *testing.T) {
 		g.Expect(err).To(HaveOccurred())
 	})
 }
+
+func TestZipkinPort(t *testing.T) {
+	t.Run("Not defined", func(t *testing.T) {
+		g := NewWithT(t)
+
+		os.Unsetenv("ZIPKIN_PORT")
+		cfg, err := ParseConfigFromEnv()
+
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(cfg.ZipkinPort).To(Equal(9410))
+	})
+
+	t.Run("Empty string", func(t *testing.T) {
+		g := NewWithT(t)
+
+		os.Setenv("ZIPKIN_PORT", "")
+		cfg, err := ParseConfigFromEnv()
+
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(cfg.ZipkinPort).To(Equal(9410))
+	})
+
+	t.Run("A number", func(t *testing.T) {
+		g := NewWithT(t)
+
+		os.Setenv("ZIPKIN_PORT", "8080")
+		cfg, err := ParseConfigFromEnv()
+
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(cfg.ZipkinPort).To(Equal(8080))
+	})
+
+	t.Run("Not a number", func(t *testing.T) {
+		g := NewWithT(t)
+
+		os.Setenv("ZIPKIN_PORT", "nine four one one")
+		_, err := ParseConfigFromEnv()
+
+		g.Expect(err).To(HaveOccurred())
+	})
+}

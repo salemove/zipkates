@@ -71,6 +71,8 @@ spec:
             value: '{"custom_label": "custom_tag"}'
           - name: LISTEN_PORT
             value: '9411'
+          - name: ZIPKIN_PORT
+            value: '9410'
       serviceAccount: zipkin
 ---
 apiVersion: v1
