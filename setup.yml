@@ -56,12 +56,17 @@ spec:
       - name: zipkin
         image: openzipkin/zipkin:2.21.1
         ports:
-        - containerPort: 9410
+        - name: query-port
+          containerPort: 9410
         env:
           - name: STORAGE_TYPE
             value: mem
           - name: QUERY_PORT
             value: "9410"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: query-port
       - name: proxy
         image: registry.local:5000/proxy:latest
         ports:
