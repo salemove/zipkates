@@ -60,6 +60,8 @@ func TestLabelTagMapping(t *testing.T) {
 
 		g.Expect(err).To(HaveOccurred())
 	})
+
+	os.Unsetenv("LABEL_TAG_MAPPING")
 }
 
 func TestListenPort(t *testing.T) {
@@ -101,6 +103,8 @@ func TestListenPort(t *testing.T) {
 
 		g.Expect(err).To(HaveOccurred())
 	})
+
+	os.Unsetenv("LISTEN_PORT")
 }
 
 func TestZipkinPort(t *testing.T) {
@@ -142,4 +146,6 @@ func TestZipkinPort(t *testing.T) {
 
 		g.Expect(err).To(HaveOccurred())
 	})
+
+	os.Unsetenv("ZIPKIN_PORT")
 }
