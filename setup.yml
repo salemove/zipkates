@@ -64,9 +64,13 @@ spec:
             value: "9410"
       - name: proxy
         image: registry.local:5000/proxy:latest
+        ports:
+        - containerPort: 9411
         env:
           - name: LABEL_TAG_MAPPING
             value: '{"custom_label": "custom_tag"}'
+          - name: LISTEN_PORT
+            value: '9411'
       serviceAccount: zipkin
 ---
 apiVersion: v1

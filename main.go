@@ -26,11 +26,13 @@ const (
 
 type Config struct {
 	LabelTagMapping map[string]string
+	ListenPort      int
 }
 
 var (
 	DefaultConfig = Config{
 		LabelTagMapping: map[string]string{"owner": "owner"},
+		ListenPort:      9411,
 	}
 )
 
@@ -205,6 +207,15 @@ func ParseConfigFromEnv() (Config, error) {
 		cfg.LabelTagMapping = labelTagMapping
 	}
 
+	listenPortEnv := os.Getenv("LISTEN_PORT")
+	if listenPortEnv != "" {
+		var listenPort int
+		if err := json.Unmarshal([]byte(listenPortEnv), &listenPort); err != nil {
+			return Config{}, fmt.Errorf("Failed to parse LISTEN_PORT env variable: %w", err)
+		}
+		cfg.ListenPort = listenPort
+	}
+
 	return cfg, nil
 }
 
@@ -239,5 +250,5 @@ func main() {
 		klog.Fatal(err)
 	}
 	handler := &httputil.ReverseProxy{Director: CreateDirector(indexer, cfg)}
-	klog.Fatal(http.ListenAndServe(":9411", handler))
+	klog.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.ListenPort), handler))
 }
