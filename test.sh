@@ -12,7 +12,7 @@ trap clean_up EXIT
 clean_up
 
 # Start the cluster and set up access
-k3d create --enable-registry --wait 300 --name="$K3D_NAME"
+k3d create --enable-registry --wait 300 --image='docker.io/rancher/k3s:v1.17.5-k3s1' --name="$K3D_NAME"
 KUBECONFIG="$(k3d get-kubeconfig --name="$K3D_NAME")"
 export KUBECONFIG
 
