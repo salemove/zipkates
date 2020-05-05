@@ -19,7 +19,7 @@ export KUBECONFIG
 # Start a zipkin instance with the sidecar and wait for it to be ready
 docker build -t 127.0.0.1:5000/proxy:latest .
 docker push 127.0.0.1:5000/proxy:latest
-kubectl apply --wait=true -f setup.yml
+kubectl apply --wait=true -f test-setup.yml
 kubectl -n test-zipkin rollout status deploy/zipkin
 
 # Run the test
