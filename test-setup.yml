@@ -67,10 +67,10 @@ spec:
           httpGet:
             path: /health
             port: query-port
-      - name: proxy
-        image: registry.local:5000/proxy:latest
+      - name: zipkates
+        image: registry.local:5000/zipkates:latest
         ports:
-        - name: proxy-port
+        - name: zipkates-port
           containerPort: 9411
         env:
           - name: LABEL_TAG_MAPPING
@@ -82,7 +82,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /healthz
-            port: proxy-port
+            port: zipkates-port
       serviceAccount: zipkin
 ---
 apiVersion: v1
@@ -102,4 +102,4 @@ spec:
     - port: 9411
       targetPort: 9411
       protocol: TCP
-      name: tcp-proxy
+      name: tcp-zipkates

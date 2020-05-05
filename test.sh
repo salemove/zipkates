@@ -17,8 +17,8 @@ KUBECONFIG="$(k3d get-kubeconfig --name="$K3D_NAME")"
 export KUBECONFIG
 
 # Start a zipkin instance with the sidecar and wait for it to be ready
-docker build -t 127.0.0.1:5000/proxy:latest .
-docker push 127.0.0.1:5000/proxy:latest
+docker build -t 127.0.0.1:5000/zipkates:latest .
+docker push 127.0.0.1:5000/zipkates:latest
 kubectl apply --wait=true -f test-setup.yml
 kubectl -n test-zipkin rollout status deploy/zipkin
 

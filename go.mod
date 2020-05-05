@@ -1,4 +1,4 @@
-module github.com/salemove/zipkin_k8s_metadata_sidecar
+module github.com/salemove/zipkates
 
 go 1.13
 
