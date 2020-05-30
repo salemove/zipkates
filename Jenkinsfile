@@ -21,8 +21,11 @@ withResultReporting(slackChannel: '#tm-inf') {
           image: jieyu/kind-cluster-buster:v0.1.0
           stdin: true
           tty: true
-          args:
+          command:
           - /bin/bash
+          args:
+          - -c
+          - cd / && exec /entrypoint.sh /bin/bash
           env:
           - name: API_SERVER_ADDRESS
             valueFrom:
