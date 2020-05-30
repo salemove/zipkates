@@ -59,7 +59,8 @@ withResultReporting(slackChannel: '#tm-inf') {
         - name: libmodules
           hostPath:
             path: /lib/modules
-    '''.stripIndent()
+    '''.stripIndent(),
+    slaveConnectTimeout: 300
   ) {
     checkout(scm)
     stage('Run tests') {
