@@ -107,7 +107,7 @@ withResultReporting(slackChannel: '#tm-inf') {
 
             # Run the test
             kubectl apply --wait=true -f test.yml
-            kubectl -n test-service wait --for=condition=complete --timeout=120s job/zipkin-client
+            kubectl -n test-service wait --for=condition=complete --timeout=300s job/zipkin-client
           """.stripIndent())
         }
       }
