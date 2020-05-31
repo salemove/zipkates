@@ -101,7 +101,7 @@ withResultReporting(slackChannel: '#tm-inf') {
             set -euo pipefail
 
             # Start a zipkin instance with the sidecar and wait for it to be ready
-            sed 's|image:.*zipkates:latest|image: ${DOCKER_PROJECT_NAME}:${version}|' test-setup.yml |
+            sed 's|image:.*zipkates:build|image: ${DOCKER_PROJECT_NAME}:${version}|' test-setup.yml |
               kubectl apply --wait=true -f-
             kubectl -n test-zipkin rollout status deploy/zipkin
 

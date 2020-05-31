@@ -68,7 +68,7 @@ spec:
             path: /health
             port: query-port
       - name: zipkates
-        image: registry.local:5000/zipkates:latest
+        image: salemove/zipkates:build
         ports:
         - name: zipkates-port
           containerPort: 9411
