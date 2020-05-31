@@ -102,6 +102,12 @@ ZIPKIN_PORT       | No       | `9410`               | The port on localhost that
   [Using Kubernetes Pod Metadata to Improve Zipkin Traces][soundcloud-blog] and
   in private conversation.
 
+## Known limitations
+
+Only [v2 Zipkin API][v2-api] is supported. The v2 API [was
+released][v2-release] in early 2018 and [the v1 API][v1-api] has been
+deprecated since.
+
 ## Possible improvements
 
 - [ ] Account for X-Forwarded-For header for detecting the pod IP
@@ -110,4 +116,7 @@ ZIPKIN_PORT       | No       | `9410`               | The port on localhost that
 - [ ] Check the Content-Type header before trying to parse JSON
 - [ ] Support TLS termination
 
-[1]: https://developers.soundcloud.com/blog/using-kubernetes-pod-metadata-to-improve-zipkin-traces
+[soundcloud-blog]: https://developers.soundcloud.com/blog/using-kubernetes-pod-metadata-to-improve-zipkin-traces
+[v1-api]: https://zipkin.io/zipkin-api/zipkin-api.yaml
+[v2-api]: https://zipkin.io/zipkin-api/zipkin2-api.yaml
+[v2-release]: https://github.com/openzipkin/zipkin/releases/tag/1.30.3
