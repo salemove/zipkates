@@ -1,0 +1,80 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-service
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: zipkin-client
+  namespace: test-service
+  labels:
+    app: zipkin-client
+spec:
+  backoffLimit: 1
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      name: zipkin-client
+      namespace: test-service
+      labels:
+        app: zipkin-client
+        custom_label: from_label
+    spec:
+      containers:
+      - name: zipkin-client
+        image: alpine:3.11
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          set -euo pipefail
+          apk add --no-cache curl jq
+
+          sample_span() {
+          cat << EOF
+          {
+            "id": "352bff9a74ca9ad2",
+            "traceId": "5af7183fb1d4cf5f",
+            "parentId": "6b221d5bc9e6496c",
+            "name": "get /api",
+            "timestamp": 1556604172355737,
+            "duration": 1431,
+            "kind": "SERVER",
+            "localEndpoint": {
+              "serviceName": "backend",
+              "ipv4": "192.168.99.1",
+              "port": 3306
+            },
+            "remoteEndpoint": {
+              "ipv4": "172.19.0.2",
+              "port": 58648
+            },
+            "tags": {
+              "http.method": "GET",
+              "http.path": "/api"
+            }
+          }
+          EOF
+          }
+
+          sample_span |
+            jq '[. * {id:"1"}, . * {id:"2",tags:{custom_tag:"from_data"}}]' |
+            curl -s -X POST "http://zipkin.test-zipkin:9411/api/v2/spans" \
+            -H "accept: application/json" \
+            -H "content-type: application/json" \
+            --data-binary @-
+
+          sample_span |
+            jq '[. * {id:"3"}]' |
+            curl -s -X POST "http://zipkin.test-zipkin:9410/api/v2/spans" \
+            -H "accept: application/json" \
+            -H "content-type: application/json" \
+            --data-binary @-
+
+          curl -s -X GET "http://zipkin.test-zipkin:9411/api/v2/trace/5af7183fb1d4cf5f" \
+            -H "accept: application/json" |
+            jq -e 'sort_by(.id) | map(.tags.custom_tag) == ["from_label", "from_data", null]'
+      restartPolicy: Never
