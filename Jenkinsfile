@@ -62,7 +62,13 @@ withResultReporting(slackChannel: '#tm-inf') {
     '''.stripIndent(),
     slaveConnectTimeout: 300
   ) {
-    checkout(scm)
+    checkout([
+      $class: 'GitSCM',
+      branches: scm.branches,
+      doGenerateSubmoduleConfigurations: scm.doGenerateSubmoduleConfigurations,
+      extensions: scm.extensions + [[$class: 'CloneOption', noTags: false]],
+      userRemoteConfigs: scm.userRemoteConfigs
+    ])
     stage('Run tests') {
       ansiColor('xterm') {
         container('go') {
